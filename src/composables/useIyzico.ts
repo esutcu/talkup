@@ -1,4 +1,3 @@
-# src/composables/useIyzico.ts
 import { ref } from 'vue'
 import { useSupabase } from './useSupabase'
 import type { PaymentOptions, PaymentResult } from '@/types/Payment'

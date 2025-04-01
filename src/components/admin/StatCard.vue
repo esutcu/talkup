@@ -1,4 +1,3 @@
-# components/admin/StatCard.vue
 <template>
   <div 
     class="rounded-lg border border-gray-200 p-4"

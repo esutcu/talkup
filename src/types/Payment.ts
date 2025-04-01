@@ -1,4 +1,3 @@
-# src/types/Payment.ts
 export interface PaymentOptions {
   packageId: string
   userId: string

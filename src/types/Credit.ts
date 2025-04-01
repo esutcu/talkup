@@ -1,4 +1,3 @@
-
 export interface CreditTransaction {
   id: string
   user_id: string
