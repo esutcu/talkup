@@ -1,3 +1,5 @@
+// useGoogleCalendar.ts
+
 import { ref } from 'vue'
 import { useSupabase } from './useSupabase'
 import { useAuthStore } from '@/stores/auth'
@@ -6,18 +8,17 @@ import { env } from '@/utils/environment'
 export function useGoogleCalendar() {
   const { supabase } = useSupabase()
   const authStore = useAuthStore()
-  
+
   const isAuthorized = ref(false)
   const isLoading = ref(false)
   const error = ref<string | null>(null)
-  const lastSyncTime = ref(Date.now() - 30 * 60 * 1000) // Son senkronizasyon zamanı (varsayılan 30 dk önce)
-  
-  // Google Calendar API için gauth client'ı
-  const initGoogleAuth = async () => {
+  const lastSyncTime = ref(Date.now() - 30 * 60 * 1000)
+
+  const initGoogleAuth = async (): Promise<gapi.auth2.GoogleAuth> => {
     if (window.gapi && window.gapi.auth2) {
-      return window.gapi.auth2.getAuthInstance()
+      return window.gapi.auth2.getAuthInstance() as gapi.auth2.GoogleAuth
     }
-    
+
     return new Promise((resolve, reject) => {
       const script = document.createElement('script')
       script.src = 'https://apis.google.com/js/api.js'
@@ -30,15 +31,14 @@ export function useGoogleCalendar() {
               discoveryDocs: ['https://www.googleapis.com/discovery/v1/apis/calendar/v3/rest'],
               scope: 'https://www.googleapis.com/auth/calendar.events'
             })
-            
-            const authInstance = window.gapi.auth2.getAuthInstance()
+
+            const authInstance = window.gapi.auth2.getAuthInstance() as gapi.auth2.GoogleAuth
             isAuthorized.value = authInstance.isSignedIn.get()
-            
-            // Auth değişikliğini dinle
-            authInstance.isSignedIn.listen((signedIn) => {
+
+            authInstance.isSignedIn.listen((signedIn: boolean) => {
               isAuthorized.value = signedIn
             })
-            
+
             resolve(authInstance)
           } catch (err) {
             reject(err)
@@ -49,19 +49,18 @@ export function useGoogleCalendar() {
       document.head.appendChild(script)
     })
   }
-  
-  // Google Calendar'a giriş yapma
+
   const authorize = async () => {
     isLoading.value = true
     error.value = null
-    
+
     try {
       const authInstance = await initGoogleAuth()
-      
+
       if (!authInstance.isSignedIn.get()) {
         await authInstance.signIn()
       }
-      
+
       isAuthorized.value = true
       return true
     } catch (err: any) {
@@ -72,18 +71,17 @@ export function useGoogleCalendar() {
       isLoading.value = false
     }
   }
-  
-  // Google Calendar'dan çıkış yapma
+
   const deauthorize = async () => {
     isLoading.value = true
-    
+
     try {
       const authInstance = await initGoogleAuth()
-      
+
       if (authInstance.isSignedIn.get()) {
         await authInstance.signOut()
       }
-      
+
       isAuthorized.value = false
       return true
     } catch (err: any) {
@@ -94,40 +92,36 @@ export function useGoogleCalendar() {
       isLoading.value = false
     }
   }
-  
-  // Takvim senkronizasyonu
+
   const syncCalendar = async () => {
     if (!authStore.userId) {
       error.value = 'Kullanıcı girişi yapılmamış'
       return false
     }
-    
+
     isLoading.value = true
     error.value = null
-    
+
     try {
       if (!isAuthorized.value) {
         await authorize()
       }
-      
-      // Mevcut dersleri al
+
       const { data: lessons, error: lessonsError } = await supabase
         .from('lessons')
         .select('*')
         .eq('teacher_id', authStore.userId)
         .gte('start_time', new Date().toISOString())
-      
+
       if (lessonsError) throw lessonsError
-      
-      // Takvim olayları oluştur ve ekle
+
       if (lessons && lessons.length > 0) {
         for (const lesson of lessons) {
-          // Google Calendar'a ekle
           const startTime = new Date(lesson.start_time)
           const endTime = new Date(startTime)
-          endTime.setHours(endTime.getHours() + 1) // 1 saatlik ders
-          
-          const event = {
+          endTime.setHours(endTime.getHours() + 1)
+
+          const event: any = {
             summary: `TalkUp Dersi: ${lesson.student_name}`,
             description: `Öğrenci: ${lesson.student_name}\nMeet Link: ${lesson.meet_link}`,
             start: {
@@ -140,22 +134,18 @@ export function useGoogleCalendar() {
             },
             reminders: {
               useDefault: false,
-              overrides: [
-                { method: 'popup', minutes: 10 }
-              ]
+              overrides: [{ method: 'popup', minutes: 10 }]
             }
           }
-          
+
           await window.gapi.client.calendar.events.insert({
             calendarId: 'primary',
             resource: event
           })
         }
       }
-      
-      // Senkronizasyon zamanını güncelle
+
       lastSyncTime.value = Date.now()
-      
       return true
     } catch (err: any) {
       console.error('Calendar sync error:', err)
@@ -165,28 +155,25 @@ export function useGoogleCalendar() {
       isLoading.value = false
     }
   }
-  
-  // Müsait saatleri Google Calendar'dan al
+
   const fetchAvailableSlots = async () => {
     if (!authStore.userId) {
       error.value = 'Kullanıcı girişi yapılmamış'
       return []
     }
-    
+
     isLoading.value = true
     error.value = null
-    
+
     try {
       if (!isAuthorized.value) {
         await authorize()
       }
-      
-      // Şu andan 2 hafta sonrasına kadar takvimi kontrol et
+
       const now = new Date()
       const twoWeeksLater = new Date(now)
       twoWeeksLater.setDate(twoWeeksLater.getDate() + 14)
-      
-      // Google Calendar olaylarını al
+
       const response = await window.gapi.client.calendar.events.list({
         calendarId: 'primary',
         timeMin: now.toISOString(),
@@ -194,47 +181,41 @@ export function useGoogleCalendar() {
         singleEvents: true,
         orderBy: 'startTime'
       })
-      
-      const events = response.result.items
-      
-      // Meşgul saatleri belirle
-      const busyTimes = events.map(event => ({
-        start: new Date(event.start.dateTime || event.start.date),
-        end: new Date(event.end.dateTime || event.end.date)
+
+      const events = response.result.items || []
+
+      const busyTimes = events.map((event: any) => ({
+        start: new Date(event.start?.dateTime || event.start?.date || ''),
+        end: new Date(event.end?.dateTime || event.end?.date || '')
       }))
       
-      // Müsait saatleri belirle (09:00-18:00 arası)
+
       const availableSlots = []
       const currentDate = new Date(now)
       currentDate.setHours(0, 0, 0, 0)
-      
-      // 14 gün için kontrol et
+
       for (let day = 0; day < 14; day++) {
         const checkDate = new Date(currentDate)
         checkDate.setDate(checkDate.getDate() + day)
-        
-        // Hafta içi mi kontrol et (1-5 = Pazartesi-Cuma)
+
         const dayOfWeek = checkDate.getDay()
         if (dayOfWeek === 0 || dayOfWeek === 6) continue
-        
-        // 9:00 - 18:00 arası her saat
+
         for (let hour = 9; hour < 18; hour++) {
           const slotStart = new Date(checkDate)
           slotStart.setHours(hour, 0, 0, 0)
-          
+
           const slotEnd = new Date(slotStart)
           slotEnd.setHours(slotEnd.getHours() + 1)
-          
-          // Geçmiş saatleri atla
+
           if (slotStart < now) continue
-          
-          // Bu slot başka bir etkinlikle çakışıyor mu kontrol et
-          const isSlotBusy = busyTimes.some(busyTime => 
-            (slotStart >= busyTime.start && slotStart < busyTime.end) || 
+
+          const isSlotBusy = busyTimes.some((busyTime: { start: Date; end: Date }) =>
+            (slotStart >= busyTime.start && slotStart < busyTime.end) ||
             (slotEnd > busyTime.start && slotEnd <= busyTime.end) ||
             (slotStart <= busyTime.start && slotEnd >= busyTime.end)
           )
-          
+
           if (!isSlotBusy) {
             availableSlots.push({
               date: slotStart.toISOString().split('T')[0],
@@ -244,7 +225,7 @@ export function useGoogleCalendar() {
           }
         }
       }
-      
+
       return availableSlots
     } catch (err: any) {
       console.error('Fetch available slots error:', err)
@@ -254,7 +235,7 @@ export function useGoogleCalendar() {
       isLoading.value = false
     }
   }
-  
+
   return {
     isAuthorized,
     isLoading,
