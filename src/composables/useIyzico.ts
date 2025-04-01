@@ -1,5 +1,6 @@
 import { ref } from 'vue'
 import { useSupabase } from './useSupabase'
+import { env } from '@/utils/environment'
 import type { PaymentOptions, PaymentResult } from '@/types/Payment'
 
 export function useIyzico() {

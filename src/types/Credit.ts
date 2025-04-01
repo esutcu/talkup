@@ -1,24 +1,34 @@
-export interface CreditTransaction {
-  id: string
-  user_id: string
-  package_id?: string
-  amount: number
-  type: 'purchase' | 'use' | 'refund'
-  description: string
-  price?: number
-  created_at: string
+import type { DbCreditTransaction, DbPackage } from './supabase'
+
+// Veritabanı tipini genişleten kredi işlem tipi
+export interface CreditTransaction extends DbCreditTransaction {
+  // DbCreditTransaction'dan gelen temel özelliklere ek olarak frontend'de kullanılacak özellikler
   package?: {
     name: string
     credit_amount: number
   }
 }
 
-export interface CreditPackage {
-  id: string
-  name: string
-  credit_amount: number
-  price: number
-  description?: string
-  is_active: boolean
-  created_at: string
+// Veritabanı tipini genişleten kredi paketi tipi
+export interface CreditPackage extends DbPackage {
+  // DbPackage'dan gelen temel özelliklere ek olarak frontend'de kullanılacak özellikler
+  total_sales?: number
+  activeUsers?: number
+  weeklySales?: number
+}
+
+// Kredi işlemi için özet tipi
+export interface CreditSummary {
+  totalPurchased: number
+  totalUsed: number
+  totalRefunded: number
+  balance: number
+  lastTransaction?: CreditTransaction
+}
+
+// Kredi işlem bilgisi için formatlı tip
+export interface FormattedCreditTransaction extends CreditTransaction {
+  typeText: string
+  color: string
+  isPositive: boolean
 }

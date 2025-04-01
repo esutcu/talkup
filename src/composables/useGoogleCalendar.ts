@@ -1,6 +1,7 @@
 import { ref } from 'vue'
 import { useSupabase } from './useSupabase'
 import { useAuthStore } from '@/stores/auth'
+import { env } from '@/utils/environment'
 
 export function useGoogleCalendar() {
   const { supabase } = useSupabase()
@@ -24,8 +25,8 @@ export function useGoogleCalendar() {
         window.gapi.load('client:auth2', async () => {
           try {
             await window.gapi.client.init({
-              apiKey: import.meta.env.VITE_GOOGLE_API_KEY,
-              clientId: import.meta.env.VITE_GOOGLE_CLIENT_ID,
+              apiKey: env.google.apiKey,
+              clientId: env.google.clientId,
               discoveryDocs: ['https://www.googleapis.com/discovery/v1/apis/calendar/v3/rest'],
               scope: 'https://www.googleapis.com/auth/calendar.events'
             })

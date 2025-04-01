@@ -4,7 +4,9 @@ import { useSupabase } from '@/composables/useSupabase'
 import { useAuthStore } from '@/stores/auth'
 import { useCredits } from '@/composables/useCredits'
 import { useJoinMeet } from '@/composables/useJoinMeet'
-import type { Booking } from '@/types/Booking'
+import type { Booking, BookingRequest, BookingWithTeacher, BookingWithStudent } from '@/types/Booking'
+import type { DbBookingInsert } from '@/types/supabase'
+import errorHandler from '@/composables/useErrorHandler'
 
 // Booking store - ders rezervasyon işlemleri için
 export const useBookingStore = defineStore('booking', () => {
@@ -22,11 +24,7 @@ export const useBookingStore = defineStore('booking', () => {
   const userId = computed(() => authStore.userId || '')
   
   // Yeni rezervasyon oluşturma
-  const createBooking = async (bookingData: {
-    teacherId: string
-    date: Date
-    startTime: string
-  }) => {
+  const createBooking = async (bookingData: BookingRequest): Promise<Booking | null> => {
     if (!userId.value) {
       error.value = 'Rezervasyon yapmak için giriş yapmalısınız'
       return null
@@ -50,7 +48,7 @@ export const useBookingStore = defineStore('booking', () => {
       const meetLink = createMeetLink(meetId)
       
       // Rezervasyon oluştur
-      const bookingInsert = {
+      const bookingInsert: DbBookingInsert = {
         student_id: userId.value,
         teacher_id: bookingData.teacherId,
         date: formattedDate,
@@ -62,7 +60,7 @@ export const useBookingStore = defineStore('booking', () => {
       const { data, error: bookingError } = await supabase
         .from('bookings')
         .insert(bookingInsert)
-        .select()
+        .select('*')
         .single()
       
       if (bookingError) throw bookingError
@@ -88,7 +86,7 @@ export const useBookingStore = defineStore('booking', () => {
       currentBooking.value = data
       return data
     } catch (err: any) {
-      console.error('Booking creation error:', err)
+      errorHandler.handleError(err, 'createBooking')
       error.value = err.message
       
       // Hata durumunda krediyi iade et

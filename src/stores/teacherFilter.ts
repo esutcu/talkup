@@ -2,6 +2,8 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { useSupabase } from '@/composables/useSupabase'
 import type { Teacher } from '@/types/User'
+import errorHandler from '@/composables/useErrorHandler'
+import globalLoading from '@/composables/useLoading'
 
 export const useTeacherFilterStore = defineStore('teacherFilter', () => {
   const { supabase } = useSupabase()
@@ -76,9 +78,10 @@ export const useTeacherFilterStore = defineStore('teacherFilter', () => {
   })
   
   // Temel öğretmenleri getir
-  const fetchTeachers = async () => {
-    isLoading.value = true
-    error.value = null
+  const fetchTeachers = async (): Promise<Teacher[]> => {
+    const loadingKey = 'fetchTeachers';
+    globalLoading.setLoading(loadingKey, true);
+    error.value = null;
     
     try {
       const { data, error: teachersError } = await supabase
@@ -93,35 +96,37 @@ export const useTeacherFilterStore = defineStore('teacherFilter', () => {
           )
         `)
         .eq('role', 'teacher')
-        .eq('status', 'active')
+        .eq('status', 'active');
       
-      if (teachersError) throw teachersError
+      if (teachersError) throw teachersError;
       
-      teachers.value = data.map((teacher: any) => ({
+      const teacherData = data.map((teacher: any) => ({
         ...teacher,
         nextAvailableSlots: teacher.slots
           .filter((slot: any) => slot.is_available && new Date(slot.date + ' ' + slot.start_time) > new Date())
           .map((slot: any) => slot.date + ' ' + slot.start_time)
           .sort()
-      }))
+      })) as Teacher[];
       
-      return data
-    } catch (err: any) {
-      console.error('Fetch teachers error:', err)
-      error.value = err.message
-      return []
+      teachers.value = teacherData;
+      return teacherData;
+    } catch (err) {
+      errorHandler.handleError(err, 'fetchTeachers');
+      error.value = err instanceof Error ? err.message : String(err);
+      return [];
     } finally {
-      isLoading.value = false
+      globalLoading.setLoading(loadingKey, false);
     }
   }
   
   // Belirli bir tarih ve saatte müsait öğretmenleri getir
-  const fetchAvailableTeachers = async (date: Date, time: string) => {
-    isLoading.value = true
-    error.value = null
+  const fetchAvailableTeachers = async (date: Date, time: string): Promise<Teacher[]> => {
+    const loadingKey = 'fetchAvailableTeachers';
+    globalLoading.setLoading(loadingKey, true);
+    error.value = null;
     
     try {
-      const formattedDate = date.toISOString().split('T')[0]
+      const formattedDate = date.toISOString().split('T')[0];
       
       const { data, error: slotsError } = await supabase
         .from('slots')
@@ -135,17 +140,17 @@ export const useTeacherFilterStore = defineStore('teacherFilter', () => {
         `)
         .eq('date', formattedDate)
         .eq('start_time', time)
-        .eq('is_available', true)
+        .eq('is_available', true);
       
-      if (slotsError) throw slotsError
+      if (slotsError) throw slotsError;
       
-      return data.map((item: any) => item.teacher)
-    } catch (err: any) {
-      console.error('Fetch available teachers error:', err)
-      error.value = err.message
-      return []
+      return data.map((item: any) => item.teacher as Teacher);
+    } catch (err) {
+      errorHandler.handleError(err, 'fetchAvailableTeachers');
+      error.value = err instanceof Error ? err.message : String(err);
+      return [];
     } finally {
-      isLoading.value = false
+      globalLoading.setLoading(loadingKey, false);
     }
   }
   
