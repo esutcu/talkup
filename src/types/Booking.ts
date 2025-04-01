@@ -53,4 +53,16 @@ export interface BookingWithStudent extends Booking {
   }
 }
 
-export interface BookingFull extends BookingWithTeacher, BookingWithStudent {}
+// Interface çakışmasını çözmek için BookingFull'u şu şekilde yeniden tanımlayın:
+export interface BookingFull extends Omit<BookingWithTeacher, 'student'>, Omit<BookingWithStudent, 'teacher'> {
+  teacher: {
+    id: string
+    name: string
+    avatar?: string
+  }
+  student: {
+    id: string
+    name: string
+    avatar?: string
+  }
+}
