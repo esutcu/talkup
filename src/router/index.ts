@@ -1,4 +1,3 @@
-
 import { createRouter, createWebHistory } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 
@@ -10,7 +9,22 @@ const router = createRouter({
       component: () => import('@/pages/index.vue'),
       meta: { requiresAuth: false }
     },
-    
+    // Login ve register sayfaları
+    {
+      path: '/login',
+      component: () => import('@/pages/index.vue'), // Geçici olarak ana sayfaya yönlendirme
+      meta: { requiresAuth: false }
+    },
+    {
+      path: '/register',
+      component: () => import('@/pages/index.vue'), // Geçici olarak ana sayfaya yönlendirme
+      meta: { requiresAuth: false }
+    },
+    {
+      path: '/terms',
+      component: () => import('@/pages/index.vue'), // Geçici olarak ana sayfaya yönlendirme
+      meta: { requiresAuth: false }
+    },
     // Admin Routes
     {
       path: '/admin',
@@ -26,25 +40,19 @@ const router = createRouter({
           component: () => import('@/pages/admin/Packages.vue'),
         },
         {
-          path: 'reports',
-          children: [
-            {
-              path: 'daily',
-              component: () => import('@/pages/admin/Reports/Daily.vue'),
-            },
-            {
-              path: 'weekly',
-              component: () => import('@/pages/admin/Reports/Weekly.vue'),
-            },
-            {
-              path: 'monthly',
-              component: () => import('@/pages/admin/Reports/Monthly.vue'),
-            }
-          ]
+          path: 'reports/daily',
+          component: () => import('@/pages/admin/Reports/Daily.vue'),
+        },
+        {
+          path: 'reports/weekly',
+          component: () => import('@/pages/admin/Reports/Weekly.vue'),
+        },
+        {
+          path: 'reports/monthly',
+          component: () => import('@/pages/admin/Reports/Monthly.vue'),
         }
       ]
     },
-
     // Teacher Routes
     {
       path: '/teacher',
@@ -56,21 +64,15 @@ const router = createRouter({
           component: () => import('@/pages/teacher/Dashboard.vue'),
         },
         {
-          path: 'calendar',
-          children: [
-            {
-              path: 'slots',
-              component: () => import('@/pages/teacher/Calendar/Slots.vue'),
-            },
-            {
-              path: 'sync',
-              component: () => import('@/pages/teacher/Calendar/Sync.vue'),
-            }
-          ]
+          path: 'calendar/slots',
+          component: () => import('@/pages/teacher/Calendar/Slots.vue'),
+        },
+        {
+          path: 'calendar/sync',
+          component: () => import('@/pages/teacher/Calendar/Sync.vue'),
         }
       ]
     },
-
     // Student Routes
     {
       path: '/student',
@@ -82,64 +84,58 @@ const router = createRouter({
           component: () => import('@/pages/student/Dashboard.vue'),
         },
         {
-          path: 'bookings',
-          children: [
-            {
-              path: 'by-teacher',
-              component: () => import('@/pages/student/Bookings/ByTeacher.vue'),
-            },
-            {
-              path: 'by-time',
-              component: () => import('@/pages/student/Bookings/ByTime.vue'),
-            },
-            {
-              path: 'history',
-              component: () => import('@/pages/student/Bookings/History.vue'),
-            },
-            {
-              path: ':id/success',
-              component: () => import('@/pages/student/Bookings/Success.vue'),
-            }
-          ]
+          path: 'bookings/by-teacher',
+          component: () => import('@/pages/student/Bookings/ByTeacher.vue'),
         },
         {
-          path: 'credits',
-          children: [
-            {
-              path: 'history',
-              component: () => import('@/pages/student/Credits/History.vue'),
-            },
-            {
-              path: 'buy',
-              component: () => import('@/pages/student/Credits/Purchase.vue'),
-            }
-          ]
+          path: 'bookings/by-time',
+          component: () => import('@/pages/student/Bookings/ByTime.vue'),
+        },
+        {
+          path: 'bookings/history',
+          component: () => import('@/pages/student/Bookings/History.vue'),
+        },
+        {
+          path: 'credits/history',
+          component: () => import('@/pages/student/Credits/History.vue'),
+        },
+        {
+          path: 'credits/buy',
+          component: () => import('@/pages/student/Credits/Purchase.vue'),
         }
       ]
+    },
+    // 404 route
+    {
+      path: '/:pathMatch(.*)*',
+      redirect: '/'
     }
   ]
 })
 
 // Navigation Guard
-router.beforeEach((to, from, next) => {
-  const authStore = useAuthStore()
+router.beforeEach(async (to, from, next) => {
+  // useAuthStore'u doğru bir şekilde kullanabilmek için burada çağırıyoruz
+  // böylece Vue context'in dışında çağırma hatası almıyoruz
+  const authStore = useAuthStore();
 
+  // Auth kontrolleri
   if (to.meta.requiresAuth && !authStore.isAuthenticated) {
-    next('/')
-    return
+    next('/login');
+    return;
   }
 
   if (to.meta.requiresAdmin && !authStore.isAdmin) {
-    next('/')
-    return
+    next('/');
+    return;
   }
 
   if (to.meta.requiresTeacher && !authStore.isTeacher) {
-    next('/')
-    return
+    next('/');
+    return;
   }
 
-  next()
-})
+  next();
+});
 
 export default router

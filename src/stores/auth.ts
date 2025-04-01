@@ -164,7 +164,7 @@ export const useAuthStore = defineStore('auth', () => {
           .eq('id', session.user.id)
           .single()
         
-        if (!userError) {
+        if (!userError && data) {
           user.value = data
         }
       }

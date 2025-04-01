@@ -1,7 +1,4 @@
 // Global tip tanımlamaları
-// Bu dosya, TypeScript'e pencere nesnesi üzerinde ek özellikleri bildirmektedir
-
-// Google API tiplerini tanımla
 interface Window {
   gapi: {
     load: (api: string, callback: () => void) => void;
@@ -26,8 +23,11 @@ interface Window {
     };
   };
   
-  // Iyzipay tiplerini tanımla
   IyzipayCheckout: {
     open: (options: any) => void;
+  };
+
+  fs?: {
+    readFile: (filepath: string, options?: { encoding?: string }) => Promise<Uint8Array | string>;
   };
 }
