@@ -1,258 +1,101 @@
 import { defineStore } from 'pinia'
-import { ref, computed } from 'vue'
+import { ref } from 'vue'
 import { useSupabase } from '@/composables/useSupabase'
-import { useAuthStore } from '@/stores/auth'
-import { useCredits } from '@/composables/useCredits'
-import { useJoinMeet } from '@/composables/useJoinMeet'
-import type { Booking, BookingRequest, BookingWithTeacher, BookingWithStudent } from '@/types/Booking'
-import type { DbBookingInsert } from '@/types/supabase'
-import errorHandler from '@/composables/useErrorHandler'
+import { useAuthStore } from './auth'
 
-// Booking store - ders rezervasyon işlemleri için
 export const useBookingStore = defineStore('booking', () => {
   const { supabase } = useSupabase()
   const authStore = useAuthStore()
-  const { useCredit, refundCredit } = useCredits()
-  const { createMeetLink } = useJoinMeet()
   
-  // State
-  const currentBooking = ref<Booking | null>(null)
   const isLoading = ref(false)
-  const error = ref<string | null>(null)
-  
-  // Computed
-  const userId = computed(() => authStore.userId || '')
-  
-  // Yeni rezervasyon oluşturma
-  const createBooking = async (bookingData: BookingRequest): Promise<Booking | null> => {
-    if (!userId.value) {
-      error.value = 'Rezervasyon yapmak için giriş yapmalısınız'
-      return null
-    }
+
+  // Öğretmenleri getir
+  const getTeachers = async () => {
+    const { data } = await supabase
+      .from('users')
+      .select('id, name, email')
+      .eq('role', 'teacher')
+      .eq('status', 'active')
     
+    return data || []
+  }
+
+  // Müsait saatleri getir
+  const getAvailableSlots = async (teacherId: string, date: string) => {
+    const { data } = await supabase
+      .from('slots')
+      .select('*')
+      .eq('teacher_id', teacherId)
+      .eq('date', date)
+      .eq('is_booked', false)
+    
+    return data || []
+  }
+
+  // Rezervasyon yap
+  const createBooking = async (teacherId: string, slotId: string) => {
+    if (!authStore.userId) return null
+
     isLoading.value = true
-    error.value = null
     
     try {
-      // Kredi kullanımı
-      const creditResult = await useCredit(userId.value)
-      if (!creditResult) {
-        throw new Error('Yetersiz kredi')
-      }
-      
-      // Formatlı tarih
-      const formattedDate = bookingData.date.toISOString().split('T')[0]
-      
+      // Slot'u kilitle
+      const { data: slot } = await supabase
+        .from('slots')
+        .update({ is_booked: true })
+        .eq('id', slotId)
+        .select()
+        .single()
+
+      if (!slot) throw new Error('Slot bulunamadı')
+
       // Meet linki oluştur
-      const meetId = `${Date.now()}-${userId.value.substring(0, 6)}-${bookingData.teacherId.substring(0, 6)}`
-      const meetLink = createMeetLink(meetId)
-      
-      // Rezervasyon oluştur
-      const bookingInsert: DbBookingInsert = {
-        student_id: userId.value,
-        teacher_id: bookingData.teacherId,
-        date: formattedDate,
-        start_time: bookingData.startTime,
-        status: 'active',
-        meet_link: meetLink,
-      }
-      
-      const { data, error: bookingError } = await supabase
+      const meetId = Math.random().toString(36).substring(7)
+      const meetLink = `https://meet.google.com/lookup/${meetId}`
+
+      // Booking oluştur
+      const { data: booking } = await supabase
         .from('bookings')
-        .insert(bookingInsert)
-        .select('*')
-        .single()
-      
-      if (bookingError) throw bookingError
-      
-      // Slot'u güncelle (müsait değil olarak işaretle)
-      await supabase
-        .from('slots')
-        .update({ is_available: false, booking_id: data.id })
-        .eq('teacher_id', bookingData.teacherId)
-        .eq('date', formattedDate)
-        .eq('start_time', bookingData.startTime)
-      
-      // Öğretmene bildirim gönder
-      await supabase
-        .from('notifications')
         .insert({
-          user_id: bookingData.teacherId,
-          type: 'booking_confirmed',
-          title: 'Yeni Rezervasyon',
-          message: `${formattedDate} tarihinde saat ${bookingData.startTime} için yeni bir rezervasyonunuz var.`,
+          student_id: authStore.userId,
+          teacher_id: teacherId,
+          slot_id: slotId,
+          meet_link: meetLink
         })
-      
-      currentBooking.value = data
-      return data
-    } catch (err: any) {
-      errorHandler.handleError(err, 'createBooking')
-      error.value = err.message
-      
-      // Hata durumunda krediyi iade et
-      if (error.value === 'Yetersiz kredi') {
-        return null
-      }
-      
-      await refundCredit(userId.value)
+        .select()
+        .single()
+
+      return booking
+    } catch (error) {
+      console.error('Booking error:', error)
       return null
     } finally {
       isLoading.value = false
     }
   }
-  
-  // Rezervasyon iptal etme
-  const cancelBooking = async (bookingId: string) => {
-    if (!userId.value) {
-      error.value = 'İşlem yapmak için giriş yapmalısınız'
-      return false
-    }
-    
-    isLoading.value = true
-    error.value = null
-    
-    try {
-      // Rezervasyonu bul
-      const { data: booking, error: bookingError } = await supabase
-        .from('bookings')
-        .select('*')
-        .eq('id', bookingId)
-        .single()
-      
-      if (bookingError) throw bookingError
-      
-      // Sadece aktif rezervasyonlar iptal edilebilir
-      if (booking.status !== 'active') {
-        throw new Error('Bu rezervasyon iptal edilemez')
-      }
-      
-      // Rezervasyon saatini kontrol et (24 saatten az kaldıysa iptal edilemez)
-      const bookingDate = new Date(`${booking.date} ${booking.start_time}`)
-      const now = new Date()
-      const timeDiff = bookingDate.getTime() - now.getTime()
-      const hoursDiff = timeDiff / (1000 * 60 * 60)
-      
-      if (hoursDiff < 24) {
-        throw new Error('Derse 24 saatten az kaldığında iptal edilemez')
-      }
-      
-      // Rezervasyonu iptal et
-      const { error: updateError } = await supabase
-        .from('bookings')
-        .update({ status: 'cancelled' })
-        .eq('id', bookingId)
-      
-      if (updateError) throw updateError
-      
-      // Krediyi iade et
-      await refundCredit(userId.value)
-      
-      // Slot'u tekrar müsait olarak işaretle
-      await supabase
-        .from('slots')
-        .update({ is_available: true, booking_id: null })
-        .eq('booking_id', bookingId)
-      
-      // Öğretmene bildirim gönder
-      await supabase
-        .from('notifications')
-        .insert({
-          user_id: booking.teacher_id,
-          type: 'booking_cancelled',
-          title: 'Rezervasyon İptali',
-          message: `${booking.date} tarihinde saat ${booking.start_time} için olan rezervasyon iptal edildi.`,
-        })
-      
-      return true
-    } catch (err: any) {
-      console.error('Booking cancellation error:', err)
-      error.value = err.message
-      return false
-    } finally {
-      isLoading.value = false
-    }
+
+  // Rezervasyonları getir
+  const getBookings = async () => {
+    if (!authStore.userId) return []
+
+    const { data } = await supabase
+      .from('bookings')
+      .select(`
+        *,
+        teacher:teacher_id (name),
+        slot:slot_id (date, start_time)
+      `)
+      .eq(authStore.userRole?.value === 'teacher' ? 'teacher_id' : 'student_id', authStore.userId)
+      .order('created_at', { ascending: false })
+
+    return data || []
   }
-  
-  // Öğrencinin rezervasyonlarını getir
-  const getStudentBookings = async () => {
-    if (!userId.value) {
-      error.value = 'İşlem yapmak için giriş yapmalısınız'
-      return []
-    }
-    
-    isLoading.value = true
-    error.value = null
-    
-    try {
-      const { data, error: bookingsError } = await supabase
-        .from('bookings')
-        .select(`
-          *,
-          teacher:teacher_id (
-            name,
-            avatar
-          )
-        `)
-        .eq('student_id', userId.value)
-        .order('date', { ascending: true })
-        .order('start_time', { ascending: true })
-      
-      if (bookingsError) throw bookingsError
-      
-      return data || []
-    } catch (err: any) {
-      console.error('Get bookings error:', err)
-      error.value = err.message
-      return []
-    } finally {
-      isLoading.value = false
-    }
-  }
-  
-  // Öğretmenin rezervasyonlarını getir
-  const getTeacherBookings = async () => {
-    if (!userId.value) {
-      error.value = 'İşlem yapmak için giriş yapmalısınız'
-      return []
-    }
-    
-    isLoading.value = true
-    error.value = null
-    
-    try {
-      const { data, error: bookingsError } = await supabase
-        .from('bookings')
-        .select(`
-          *,
-          student:student_id (
-            name,
-            avatar
-          )
-        `)
-        .eq('teacher_id', userId.value)
-        .order('date', { ascending: true })
-        .order('start_time', { ascending: true })
-      
-      if (bookingsError) throw bookingsError
-      
-      return data || []
-    } catch (err: any) {
-      console.error('Get teacher bookings error:', err)
-      error.value = err.message
-      return []
-    } finally {
-      isLoading.value = false
-    }
-  }
-  
+
   return {
-    currentBooking,
     isLoading,
-    error,
-    userId,
+    getTeachers,
+    getAvailableSlots,
     createBooking,
-    cancelBooking,
-    getStudentBookings,
-    getTeacherBookings
+    getBookings
   }
 })

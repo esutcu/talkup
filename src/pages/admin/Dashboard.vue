@@ -1,261 +1,238 @@
-# AdminDashboard.vue
+# src/pages/admin/Dashboard.vue
 <template>
   <div class="p-6 space-y-6">
     <!-- Header -->
     <div class="flex justify-between items-center">
-      <h1 class="text-2xl font-bold text-[#3871b1]">Yönetim Paneli</h1>
+      <h1 class="text-xl font-semibold text-[#3871b1]">Yönetim Paneli</h1>
       <button 
-        class="px-4 py-2 bg-[#ff8913] hover:bg-[#ff8913]/90 text-white rounded-lg"
-        @click="router.push('/admin/packages/new')"
+        class="px-4 py-2 bg-[#ff8913] text-white rounded-lg"
+        @click="$router.push('/admin/packages')"
       >
-        Yeni Paket Oluştur
+        Paket Yönetimi
       </button>
     </div>
 
-    <!-- Ana İstatistikler -->
-    <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
-      <!-- Aktif Öğrenciler -->
-      <stat-card
-        title="Aktif Öğrenciler"
-        :value="stats.activeStudents"
-        :change="stats.studentChange"
-        icon="users"
-        color="#3871b1"
-      />
+    <!-- İstatistik Kartları -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <!-- Öğrenci Sayısı -->
+      <div class="border rounded-lg p-4">
+        <div class="flex justify-between items-center">
+          <div>
+            <div class="text-sm text-gray-500">Aktif Öğrenciler</div>
+            <div class="text-2xl font-bold text-[#3871b1] mt-1">{{ stats.students }}</div>
+          </div>
+          <users-icon class="h-6 w-6 text-[#3871b1]" />
+        </div>
+      </div>
 
-      <!-- Aktif Öğretmenler -->
-      <stat-card
-        title="Aktif Öğretmenler"
-        :value="stats.activeTeachers"
-        :change="stats.teacherChange"
-        icon="users"
-        color="#ff8913"
-      />
+      <!-- Öğretmen Sayısı -->
+      <div class="border rounded-lg p-4">
+        <div class="flex justify-between items-center">
+          <div>
+            <div class="text-sm text-gray-500">Aktif Öğretmenler</div>
+            <div class="text-2xl font-bold text-[#3871b1] mt-1">{{ stats.teachers }}</div>
+          </div>
+          <book-icon class="h-6 w-6 text-[#3871b1]" />
+        </div>
+      </div>
 
-      <!-- Toplam Satılan Kredi -->
-      <stat-card
-        title="Satılan Kredi"
-        :value="stats.totalCredits"
-        subtitle="Bu ay"
-        icon="credit-card"
-        color="#3871b1"
-      />
-
-      <!-- Tamamlanan Dersler -->
-      <stat-card
-        title="Tamamlanan Dersler"
-        :value="stats.completedLessons"
-        subtitle="Bu ay"
-        icon="calendar"
-        color="#ff8913"
-      />
+      <!-- Toplam Ders -->
+      <div class="border rounded-lg p-4">
+        <div class="flex justify-between items-center">
+          <div>
+            <div class="text-sm text-gray-500">Tamamlanan Dersler</div>
+            <div class="text-2xl font-bold text-[#3871b1] mt-1">{{ stats.lessons }}</div>
+          </div>
+          <calendar-icon class="h-6 w-6 text-[#3871b1]" />
+        </div>
+      </div>
     </div>
 
     <!-- Aktif Paketler -->
-    <div class="rounded-lg border border-gray-200">
-      <div class="p-4 border-b flex justify-between items-center">
+    <div class="bg-white rounded-lg border">
+      <div class="p-4 border-b">
         <h2 class="font-medium">Aktif Paketler</h2>
-        <button 
-          class="px-4 py-2 bg-[#3871b1] hover:bg-[#3871b1]/90 text-white rounded-lg"
-          @click="router.push('/admin/packages')"
-        >
-          Paketleri Düzenle
-        </button>
       </div>
       <div class="p-4">
         <div class="space-y-4">
           <div 
-            v-for="package in activePackages" 
-            :key="package.id"
-            class="flex items-center p-4 bg-gray-50 rounded-lg"
+            v-for="pkg in packages" 
+            :key="pkg.id"
+            class="flex items-center justify-between p-4 bg-gray-50 rounded-lg"
           >
-            <package-icon class="h-8 w-8 text-[#ff8913]" />
-            <div class="ml-4 flex-1">
-              <h3 class="font-medium text-[#3871b1]">{{ package.name }}</h3>
-              <div class="flex items-center mt-1 text-sm text-gray-500">
-                <span>{{ package.credits }} Kredi • {{ formatPrice(package.price) }} • {{ package.activeUsers }} Aktif Kullanıcı</span>
-              </div>
+            <div>
+              <div class="font-medium">{{ pkg.name }}</div>
+              <div class="text-sm text-gray-500">{{ pkg.credits }} Kredi - {{ formatPrice(pkg.price) }}</div>
             </div>
-            <div class="text-right">
-              <div class="text-sm font-medium">Son 7 Gün</div>
-              <div class="text-2xl font-bold text-[#3871b1]">{{ package.weeklySales }} Satış</div>
+            <div class="flex items-center gap-2">
+              <button
+                @click="editPackage(pkg)"
+                class="p-1 text-gray-500 hover:text-[#3871b1]"
+              >
+                <pencil-icon class="h-5 w-5" />
+              </button>
+              <button
+                @click="togglePackageStatus(pkg)"
+                class="p-1 text-gray-500 hover:text-[#ff8913]"
+              >
+                <power-icon class="h-5 w-5" />
+              </button>
             </div>
           </div>
         </div>
       </div>
     </div>
 
-    <!-- Alt Grid -->
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-      <!-- Hızlı Raporlar -->
-      <div class="rounded-lg border border-gray-200">
-        <div class="p-4 border-b">
-          <h2 class="font-medium">Hızlı Raporlar</h2>
-        </div>
-        <div class="p-4 space-y-2">
-          <button 
-            v-for="report in quickReports"
-            :key="report.path"
-            class="w-full flex items-center px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-900 rounded-lg"
-            @click="router.push(report.path)"
-          >
-            <component :is="report.icon" class="h-4 w-4 mr-2" />
-            {{ report.title }}
-          </button>
-        </div>
-      </div>
+    <!-- Paket Düzenleme Modalı -->
+    <modal-dialog v-model="showPackageModal">
+      <div class="p-6 space-y-6">
+        <h3 class="text-lg font-medium text-[#3871b1]">
+          {{ editingPackage.id ? 'Paketi Düzenle' : 'Yeni Paket' }}
+        </h3>
 
-      <!-- Son İşlemler -->
-      <div class="rounded-lg border border-gray-200">
-        <div class="p-4 border-b">
-          <h2 class="font-medium">Son İşlemler</h2>
-        </div>
-        <div class="p-4">
-          <div class="space-y-4">
-            <div 
-              v-for="transaction in recentTransactions" 
-              :key="transaction.id"
-              class="flex items-center text-sm"
+        <form @submit.prevent="savePackage" class="space-y-4">
+          <div>
+            <label class="block text-sm font-medium mb-1">Paket Adı</label>
+            <input
+              v-model="editingPackage.name"
+              type="text"
+              class="w-full p-2 border rounded-lg"
+              required
+            />
+          </div>
+
+          <div>
+            <label class="block text-sm font-medium mb-1">Kredi</label>
+            <input
+              v-model.number="editingPackage.credits"
+              type="number"
+              class="w-full p-2 border rounded-lg"
+              required
+            />
+          </div>
+
+          <div>
+            <label class="block text-sm font-medium mb-1">Fiyat (₺)</label>
+            <input
+              v-model.number="editingPackage.price"
+              type="number"
+              class="w-full p-2 border rounded-lg"
+              required
+            />
+          </div>
+
+          <div class="flex justify-end gap-2">
+            <button
+              type="button"
+              @click="showPackageModal = false"
+              class="px-4 py-2 text-gray-600 bg-gray-100 rounded-lg"
             >
-              <component 
-                :is="transaction.icon" 
-                class="h-4 w-4 mr-2"
-                :class="transaction.iconColor"
-              />
-              <span class="flex-1">{{ transaction.description }}</span>
-              <span class="text-gray-500">{{ formatTimeAgo(transaction.timestamp) }}</span>
-            </div>
+              İptal
+            </button>
+            <button
+              type="submit"
+              class="px-4 py-2 bg-[#3871b1] text-white rounded-lg"
+            >
+              Kaydet
+            </button>
           </div>
-        </div>
+        </form>
       </div>
-    </div>
+    </modal-dialog>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
-import { 
-  Package as PackageIcon,
-  BarChart,
-  TrendingUp,
-  CreditCard,
-  Users,
-  Calendar
-} from 'lucide-vue-next'
+import { Users, Book, Calendar, Pencil, Power } from 'lucide-vue-next'
 import { useSupabase } from '@/composables/useSupabase'
-import StatCard from '@/components/admin/StatCard.vue'
-import type { Package } from '@/types/Package'
-import { formatPrice, formatTimeAgo } from '@/utils/dateTime'
+import ModalDialog from '@/components/common/ModalDialog.vue'
+import { formatPrice } from '@/utils/dateTime'
 
-const router = useRouter()
 const { supabase } = useSupabase()
 
 // State
-const stats = ref({
-  activeStudents: 0,
-  studentChange: 0,
-  activeTeachers: 0,
-  teacherChange: 0,
-  totalCredits: 0,
-  completedLessons: 0
-})
-
-const activePackages = ref<Package[]>([])
-
-const quickReports = [
-  { 
-    title: 'Günlük Satış Raporu',
-    path: '/admin/reports/daily',
-    icon: BarChart
-  },
-  { 
-    title: 'Aylık Performans Raporu',
-    path: '/admin/reports/monthly',
-    icon: TrendingUp
-  }
-]
-
-const recentTransactions = ref([
-  {
-    id: 1,
-    description: 'Yeni paket satın alındı - Premium',
-    timestamp: new Date(Date.now() - 2 * 60 * 1000),
-    icon: CreditCard,
-    iconColor: 'text-[#3871b1]'
-  },
-  {
-    id: 2,
-    description: 'Yeni öğretmen kaydı',
-    timestamp: new Date(Date.now() - 15 * 60 * 1000),
-    icon: Users,
-    iconColor: 'text-[#ff8913]'
-  }
-])
+const stats = ref({ students: 0, teachers: 0, lessons: 0 })
+const packages = ref([])
+const showPackageModal = ref(false)
+const editingPackage = ref({ name: '', credits: 0, price: 0 })
 
 // Methods
 const fetchStats = async () => {
-  // Aktif öğrenci sayısı
+  // Öğrenci sayısı
   const { data: students } = await supabase
     .from('users')
     .select('count')
     .eq('role', 'student')
     .eq('status', 'active')
+    .single()
 
-  // Aktif öğretmen sayısı
+  // Öğretmen sayısı
   const { data: teachers } = await supabase
     .from('users')
     .select('count')
     .eq('role', 'teacher')
     .eq('status', 'active')
+    .single()
 
-  // Bu ayki satılan krediler
-  const startOfMonth = new Date()
-  startOfMonth.setDate(1)
-  startOfMonth.setHours(0,0,0,0)
-  
-  const { data: credits } = await supabase
-    .from('credit_transactions')
-    .select('sum(amount)')
-    .gte('created_at', startOfMonth.toISOString())
-
-  // Bu ay tamamlanan dersler
+  // Ders sayısı
   const { data: lessons } = await supabase
-    .from('lessons')
+    .from('bookings')
     .select('count')
-    .gte('start_time', startOfMonth.toISOString())
-    .lt('start_time', new Date().toISOString())
     .eq('status', 'completed')
+    .single()
 
   stats.value = {
-    activeStudents: students?.[0]?.count || 0,
-    studentChange: 12,
-    activeTeachers: teachers?.[0]?.count || 0,
-    teacherChange: 2,
-    totalCredits: credits?.[0]?.sum || 0,
-    completedLessons: lessons?.[0]?.count || 0
+    students: students?.count || 0,
+    teachers: teachers?.count || 0,
+    lessons: lessons?.count || 0
   }
 }
 
-const fetchActivePackages = async () => {
-  const { data, error } = await supabase
+const fetchPackages = async () => {
+  const { data } = await supabase
     .from('packages')
-    .select(`
-      *,
-      active_users:users(count)
-    `)
-    .eq('status', 'active')
+    .select('*')
+    .order('credits')
 
-  if (data && !error) {
-    activePackages.value = data
+  if (data) {
+    packages.value = data
   }
 }
 
-// Lifecycle
-onMounted(async () => {
-  await Promise.all([
-    fetchStats(),
-    fetchActivePackages()
-  ])
+const editPackage = (pkg) => {
+  editingPackage.value = { ...pkg }
+  showPackageModal.value = true
+}
+
+const savePackage = async () => {
+  if (editingPackage.value.id) {
+    await supabase
+      .from('packages')
+      .update(editingPackage.value)
+      .eq('id', editingPackage.value.id)
+  } else {
+    await supabase
+      .from('packages')
+      .insert(editingPackage.value)
+  }
+
+  showPackageModal.value = false
+  await fetchPackages()
+}
+
+const togglePackageStatus = async (pkg) => {
+  await supabase
+    .from('packages')
+    .update({ is_active: !pkg.is_active })
+    .eq('id', pkg.id)
+
+  await fetchPackages()
+}
+
+// Initial load
+onMounted(() => {
+  fetchStats()
+  fetchPackages()
 })
 </script>
