@@ -1,7 +1,15 @@
 import { ref } from 'vue'
 import { createClient, SupabaseClient, PostgrestError } from '@supabase/supabase-js'
-import { env, checkEnvironment } from '@/utils/environment'
 import type { Database } from '@/types/supabase'
+
+// Environment variables
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
+
+// Validate environment variables
+if (!supabaseUrl || !supabaseAnonKey) {
+  throw new Error('Missing Supabase environment variables')
+}
 
 // Singleton pattern için supabase client'ı
 let supabaseInstance: SupabaseClient<Database> | null = null
@@ -14,14 +22,22 @@ export function useSupabase() {
   const getSupabaseClient = (): SupabaseClient<Database> => {
     if (supabaseInstance) return supabaseInstance
 
-    // Çevre değişkenlerini kontrol et
-    const isEnvironmentValid = checkEnvironment()
-    if (!isEnvironmentValid) {
-      throw new Error('Supabase konfigürasyonu eksik. .env dosyasını kontrol edin.')
+    try {
+      supabaseInstance = createClient<Database>(
+        supabaseUrl,
+        supabaseAnonKey,
+        {
+          auth: {
+            persistSession: true,
+            autoRefreshToken: true,
+          }
+        }
+      )
+      return supabaseInstance
+    } catch (err) {
+      console.error('Supabase client creation error:', err)
+      throw new Error('Failed to initialize Supabase client')
     }
-
-    supabaseInstance = createClient<Database>(env.supabase.url, env.supabase.anonKey)
-    return supabaseInstance
   }
 
   // Supabase client instance'ını döndür
