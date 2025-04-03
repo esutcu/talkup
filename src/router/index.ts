@@ -1,5 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
+import MainLayout from '@/layouts/MainLayout.vue'
 
 const router = createRouter({
   history: createWebHistory(),
@@ -9,10 +10,20 @@ const router = createRouter({
       component: () => import('@/pages/Landing.vue'),
       meta: { requiresAuth: false }
     },
-    // Öğrenci Paneli
+    {
+      path: '/login',
+      component: () => import('@/pages/auth/Login.vue'),
+      meta: { requiresAuth: false }
+    },
+    {
+      path: '/register',
+      component: () => import('@/pages/auth/Register.vue'),
+      meta: { requiresAuth: false }
+    },
+    // Öğrenci routes
     {
       path: '/student',
-      component: () => import('@/layouts/StudentLayout.vue'),
+      component: MainLayout,
       meta: { requiresAuth: true, role: 'student' },
       children: [
         {
@@ -20,19 +31,15 @@ const router = createRouter({
           component: () => import('@/pages/student/Dashboard.vue')
         },
         {
-          path: 'bookings', 
+          path: 'bookings',
           component: () => import('@/pages/student/Bookings.vue')
-        },
-        {
-          path: 'credits',
-          component: () => import('@/pages/student/Credits.vue')
         }
       ]
     },
-    // Öğretmen Paneli  
+    // Öğretmen routes
     {
       path: '/teacher',
-      component: () => import('@/layouts/TeacherLayout.vue'), 
+      component: MainLayout,
       meta: { requiresAuth: true, role: 'teacher' },
       children: [
         {
@@ -45,16 +52,21 @@ const router = createRouter({
         }
       ]
     },
-    // Auth Sayfaları
+    // Admin routes
     {
-      path: '/login',
-      component: () => import('@/pages/auth/Login.vue'),
-      meta: { requiresAuth: false }
-    },
-    {
-      path: '/register',
-      component: () => import('@/pages/auth/Register.vue'),
-      meta: { requiresAuth: false }
+      path: '/admin',
+      component: MainLayout,
+      meta: { requiresAuth: true, role: 'admin' },
+      children: [
+        {
+          path: '',
+          component: () => import('@/pages/admin/Dashboard.vue')
+        },
+        {
+          path: 'packages',
+          component: () => import('@/pages/admin/Packages.vue')
+        }
+      ]
     }
   ]
 })

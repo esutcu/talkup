@@ -1,6 +1,5 @@
-# src/pages/admin/Dashboard.vue
 <template>
-  <div class="p-6 space-y-6">
+  <div class="space-y-6">
     <!-- Header -->
     <div class="flex justify-between items-center">
       <h1 class="text-xl font-semibold text-[#3871b1]">Yönetim Paneli</h1>
@@ -15,7 +14,7 @@
     <!-- İstatistik Kartları -->
     <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
       <!-- Öğrenci Sayısı -->
-      <div class="border rounded-lg p-4">
+      <div class="bg-white rounded-lg border p-4">
         <div class="flex justify-between items-center">
           <div>
             <div class="text-sm text-gray-500">Aktif Öğrenciler</div>
@@ -26,7 +25,7 @@
       </div>
 
       <!-- Öğretmen Sayısı -->
-      <div class="border rounded-lg p-4">
+      <div class="bg-white rounded-lg border p-4">
         <div class="flex justify-between items-center">
           <div>
             <div class="text-sm text-gray-500">Aktif Öğretmenler</div>
@@ -37,7 +36,7 @@
       </div>
 
       <!-- Toplam Ders -->
-      <div class="border rounded-lg p-4">
+      <div class="bg-white rounded-lg border p-4">
         <div class="flex justify-between items-center">
           <div>
             <div class="text-sm text-gray-500">Tamamlanan Dersler</div>

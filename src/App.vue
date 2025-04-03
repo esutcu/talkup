@@ -30,6 +30,7 @@ body {
   flex-direction: column;
 }
 
+/* Temel buton stilleri */
 .btn-primary {
   @apply px-4 py-2 bg-[#3871b1] text-white rounded-lg hover:bg-[#3871b1]/90;
 }
