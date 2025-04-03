@@ -2,65 +2,70 @@
   <div class="p-6 space-y-6">
     <!-- Header -->
     <div class="flex justify-between items-center">
-      <h1 class="text-2xl font-bold text-[#3871b1]">Hoş Geldin, {{ userName }}</h1>
+      <h1 class="text-2xl font-bold text-[#3871b1]">Hoş Geldin, {{ user?.name }}</h1>
       <button 
-        class="px-4 py-2 bg-[#ff8913] text-white rounded-lg"
-        @click="$router.push('/student/bookings/by-teacher')"
+        @click="$router.push('/student/bookings')"
+        class="px-4 py-2 bg-[#ff8913] text-white rounded-lg hover:bg-[#ff8913]/90"
       >
         Ders Al
       </button>
     </div>
 
-    <!-- Kredi Kartı -->
+    <!-- Kredi Durumu -->
     <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-      <div class="rounded-lg border p-4">
+      <div class="bg-white rounded-lg border p-6">
         <div class="flex justify-between items-center">
           <div>
-            <div class="text-sm text-gray-500">Kredi Bakiyesi</div>
+            <div class="text-sm text-gray-500">Kredi Bakiyeniz</div>
             <div class="text-2xl font-bold text-[#3871b1] mt-1">{{ credits }} Kredi</div>
           </div>
           <credit-card-icon class="h-6 w-6 text-[#3871b1]" />
         </div>
+        <button 
+          @click="$router.push('/student/credits')"
+          class="mt-4 w-full px-4 py-2 border border-[#3871b1] text-[#3871b1] rounded-lg hover:bg-[#3871b1] hover:text-white"
+        >
+          Kredi Satın Al
+        </button>
       </div>
     </div>
 
     <!-- Yaklaşan Dersler -->
-    <div class="rounded-lg border">
+    <div class="bg-white rounded-lg border">
       <div class="p-4 border-b">
         <h2 class="font-medium">Yaklaşan Derslerim</h2>
       </div>
       <div class="p-4">
-        <div class="space-y-4">
+        <div v-if="upcomingLessons.length === 0" class="text-center py-8 text-gray-500">
+          Henüz rezervasyonunuz bulunmuyor.
+          <button 
+            @click="$router.push('/student/bookings')"
+            class="block mt-2 text-[#3871b1] hover:underline"
+          >
+            Hemen Ders Alın
+          </button>
+        </div>
+        
+        <div v-else class="space-y-4">
           <div 
-            v-for="booking in bookings" 
-            :key="booking.id"
+            v-for="lesson in upcomingLessons" 
+            :key="lesson.id"
             class="flex items-center justify-between p-4 bg-gray-50 rounded-lg"
           >
             <div>
-              <div class="font-medium">{{ booking.teacher.name }}</div>
+              <div class="font-medium">{{ lesson.teacher.name }}</div>
               <div class="text-sm text-gray-500">
-                {{ formatDate(booking.slot.date) }} - {{ booking.slot.start_time }}
+                {{ formatDateTime(lesson.startTime) }}
               </div>
             </div>
+            
             <button 
-              v-if="isLessonTime(booking)"
-              @click="joinLesson(booking.meet_link)"
-              class="px-4 py-2 bg-[#3871b1] text-white rounded-lg"
+              v-if="isLessonJoinable(lesson)"
+              @click="joinLesson(lesson.meetLink)"
+              class="px-4 py-2 bg-[#3871b1] text-white rounded-lg hover:bg-[#3871b1]/90"
             >
               Derse Katıl
             </button>
-          </div>
-
-          <div v-if="bookings.length === 0" class="text-center py-8 text-gray-500">
-            Henüz rezervasyonunuz bulunmuyor.
-            <div class="mt-2">
-              <button 
-                @click="$router.push('/student/bookings/by-teacher')"
-                class="text-[#3871b1] hover:underline"
-              >
-                Hemen Ders Alın
-              </button>
-            </div>
           </div>
         </div>
       </div>
@@ -72,34 +77,48 @@
 import { ref, onMounted } from 'vue'
 import { CreditCard as CreditCardIcon } from 'lucide-vue-next'
 import { useAuthStore } from '@/stores/auth'
-import { useBookingStore } from '@/stores/booking'
-import { formatDate } from '@/utils/dateTime'
+import { useSupabase } from '@/composables/useSupabase'
+import { formatDateTime } from '@/utils/dateTime'
 
 const authStore = useAuthStore()
-const bookingStore = useBookingStore()
+const { supabase } = useSupabase()
 
-const userName = ref('')
+const user = authStore.user
 const credits = ref(0)
-const bookings = ref([])
+const upcomingLessons = ref([])
 
-const isLessonTime = (booking: any) => {
+const isLessonJoinable = (lesson) => {
   const now = new Date()
-  const lessonTime = new Date(booking.slot.date + ' ' + booking.slot.start_time)
+  const lessonTime = new Date(lesson.startTime)
   const diffMinutes = (lessonTime.getTime() - now.getTime()) / (1000 * 60)
   return diffMinutes <= 5 && diffMinutes >= -60
 }
 
-const joinLesson = (meetLink: string) => {
+const joinLesson = (meetLink) => {
   window.open(meetLink, '_blank')
 }
 
-onMounted(async () => {
-  if (authStore.user) {
-    userName.value = authStore.user.name
-    credits.value = authStore.user.credits
+const fetchUpcomingLessons = async () => {
+  const { data } = await supabase
+    .from('bookings')
+    .select(`
+      *,
+      teacher:teacher_id (name)
+    `)
+    .eq('student_id', user.value.id)
+    .eq('status', 'active')
+    .gte('start_time', new Date().toISOString())
+    .order('start_time')
+    
+  if (data) {
+    upcomingLessons.value = data
   }
-  
-  const bookingData = await bookingStore.getBookings()
-  bookings.value = bookingData
+}
+
+onMounted(async () => {
+  if (user.value) {
+    credits.value = user.value.credits
+    await fetchUpcomingLessons()
+  }
 })
 </script>
