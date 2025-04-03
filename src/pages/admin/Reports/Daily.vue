@@ -113,7 +113,7 @@
   </template>
   
   <script setup lang="ts">
-  import { ref, onMounted, computed } from 'vue'
+  import { ref, onMounted} from 'vue'
   import { Download as DownloadIcon } from 'lucide-vue-next'
   import { useSupabase } from '@/composables/useSupabase'
   import DatePicker from '@/components/common/DatePicker.vue'

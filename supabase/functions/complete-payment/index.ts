@@ -1,16 +1,44 @@
-# supabase/functions/complete-payment/index.ts
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import Iyzipay from 'https://esm.sh/iyzipay'
 
-const iyzipay = new Iyzipay({
-  apiKey: Deno.env.get('IYZIPAY_API_KEY'),
-  secretKey: Deno.env.get('IYZIPAY_SECRET_KEY'),
-  uri: Deno.env.get('IYZIPAY_BASE_URL')
-})
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+}
 
 serve(async (req) => {
+  // CORS için OPTIONS request kontrol
+  if (req.method === 'OPTIONS') {
+    return new Response('ok', { headers: corsHeaders })
+  }
+
   try {
     const { token, packageId, userId } = await req.json()
+    
+    // API anahtarlarını kontrol et
+    const apiKey = Deno.env.get('IYZIPAY_API_KEY')
+    const secretKey = Deno.env.get('IYZIPAY_SECRET_KEY')
+    const baseUrl = Deno.env.get('IYZIPAY_BASE_URL')
+    
+    if (!apiKey || !secretKey || !baseUrl) {
+      throw new Error('Iyzipay API bilgileri eksik')
+    }
+
+    const iyzipay = new Iyzipay({
+      apiKey,
+      secretKey,
+      uri: baseUrl
+    })
+
+    // Supabase client oluştur
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')
+    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
+
+    if (!supabaseUrl || !supabaseKey) {
+      throw new Error('Supabase URL veya Service Role Key eksik')
+    }
+
+    const supabaseClient = createClient(supabaseUrl, supabaseKey)
 
     // Ödeme sonucunu kontrol et
     const result = await new Promise((resolve, reject) => {
@@ -27,7 +55,7 @@ serve(async (req) => {
     }
 
     // Paketi al
-    const { data: packageData, error: packageError } = await supabase
+    const { data: packageData, error: packageError } = await supabaseClient
       .from('packages')
       .select('*')
       .eq('id', packageId)
@@ -36,7 +64,7 @@ serve(async (req) => {
     if (packageError) throw packageError
 
     // Kredi ekle ve işlemi güncelle
-    await supabase.transaction(async (tx) => {
+    await supabaseClient.transaction(async (tx) => {
       // Kullanıcıya kredi ekle
       await tx
         .from('users')
@@ -68,13 +96,22 @@ serve(async (req) => {
 
     return new Response(
       JSON.stringify({ success: true }),
-      { headers: { 'Content-Type': 'application/json' } }
+      { headers: { 
+        ...corsHeaders,
+        'Content-Type': 'application/json' 
+      } }
     )
 
   } catch (error) {
     return new Response(
       JSON.stringify({ error: error.message }),
-      { status: 400, headers: { 'Content-Type': 'application/json' } }
+      { 
+        status: 400, 
+        headers: { 
+          ...corsHeaders,
+          'Content-Type': 'application/json' 
+        } 
+      }
     )
   }
 })

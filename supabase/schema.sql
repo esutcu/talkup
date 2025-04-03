@@ -62,7 +62,7 @@ CREATE TABLE IF NOT EXISTS public.bookings (
 -- Kredi işlemleri tablosu
 CREATE TABLE IF NOT EXISTS public.credit_transactions (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    user_id UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+    user_id UUID NOT NULL REFERENCES public.users(id) ON DELETE RESTRICT,
     package_id UUID REFERENCES public.packages(id),
     amount INTEGER NOT NULL,
     type TEXT NOT NULL CHECK (type IN ('purchase', 'use', 'refund')),
@@ -74,7 +74,7 @@ CREATE TABLE IF NOT EXISTS public.credit_transactions (
 -- Ödeme işlemleri tablosu
 CREATE TABLE IF NOT EXISTS public.payment_transactions (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    user_id UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+    user_id UUID NOT NULL REFERENCES public.users(id) ON DELETE RESTRICT,
     package_id UUID NOT NULL REFERENCES public.packages(id) ON DELETE CASCADE,
     amount DECIMAL(10, 2) NOT NULL,
     currency TEXT NOT NULL DEFAULT 'TRY',
@@ -116,6 +116,119 @@ CREATE TABLE IF NOT EXISTS public.sync_logs (
     timestamp TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     status TEXT NOT NULL CHECK (status IN ('success', 'failed'))
 );
+
+-- Müsait bir slotu kontrol edip kilitleyen fonksiyon
+CREATE OR REPLACE FUNCTION check_and_lock_slot(
+  p_teacher_id UUID,
+  p_date DATE,
+  p_start_time TIME
+)
+RETURNS SETOF slots
+LANGUAGE plpgsql
+AS $$
+BEGIN
+  RETURN QUERY
+  UPDATE slots
+  SET is_available = false, updated_at = NOW()
+  WHERE teacher_id = p_teacher_id 
+    AND date = p_date 
+    AND start_time = p_start_time
+    AND is_available = true
+    AND booking_id IS NULL
+  RETURNING *;
+END;
+$$;
+
+-- Rezervasyon oluşturan ve kredi düşen transaction
+CREATE OR REPLACE FUNCTION create_booking_transaction(
+  p_booking_id UUID,
+  p_student_id UUID,
+  p_teacher_id UUID,
+  p_date DATE,
+  p_start_time TIME,
+  p_slot_id UUID
+)
+RETURNS JSON
+LANGUAGE plpgsql
+AS $$
+DECLARE
+  v_end_time TIME;
+  v_result JSON;
+BEGIN
+  -- End time hesapla (1 saat ekliyoruz)
+  SELECT (p_start_time::time + interval '1 hour')::time INTO v_end_time;
+  
+  -- Transaction başlat
+  BEGIN
+    -- 1. Krediyi düş
+    UPDATE users
+    SET credits = credits - 1,
+        updated_at = NOW()
+    WHERE id = p_student_id AND credits >= 1;
+    
+    IF NOT FOUND THEN
+      RAISE EXCEPTION 'Yetersiz kredi';
+    END IF;
+    
+    -- 2. Rezervasyon oluştur
+    INSERT INTO bookings (
+      id,
+      student_id,
+      teacher_id,
+      date,
+      start_time,
+      end_time,
+      status,
+      created_at
+    )
+    VALUES (
+      p_booking_id,
+      p_student_id,
+      p_teacher_id,
+      p_date,
+      p_start_time,
+      v_end_time,
+      'active',
+      NOW()
+    );
+    
+    -- 3. Slot'u güncelle
+    UPDATE slots
+    SET booking_id = p_booking_id,
+        is_available = false,
+        updated_at = NOW()
+    WHERE id = p_slot_id;
+    
+    -- 4. Kredi işlem kaydı oluştur
+    INSERT INTO credit_transactions (
+      user_id,
+      amount,
+      type,
+      description,
+      created_at
+    )
+    VALUES (
+      p_student_id,
+      -1,
+      'use',
+      'Ders rezervasyonu',
+      NOW()
+    );
+    
+    -- Sonuç oluştur
+    SELECT json_build_object(
+      'success', true,
+      'booking_id', p_booking_id
+    ) INTO v_result;
+    
+    RETURN v_result;
+  EXCEPTION
+    WHEN OTHERS THEN
+      -- Hata durumunda rollback yapılır
+      RAISE;
+  END;
+END;
+$$;
 
 -- Indeksler
 CREATE INDEX IF NOT EXISTS idx_slots_teacher_date ON public.slots(teacher_id, date);

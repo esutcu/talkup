@@ -1,19 +1,47 @@
-# supabase/functions/initialize-payment/index.ts
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import Iyzipay from 'https://esm.sh/iyzipay'
 
-const iyzipay = new Iyzipay({
-  apiKey: Deno.env.get('IYZIPAY_API_KEY'),
-  secretKey: Deno.env.get('IYZIPAY_SECRET_KEY'),
-  uri: Deno.env.get('IYZIPAY_BASE_URL')
-})
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+}
 
 serve(async (req) => {
+  // CORS için OPTIONS request kontrol
+  if (req.method === 'OPTIONS') {
+    return new Response('ok', { headers: corsHeaders })
+  }
+
   try {
     const { packageId, userId, price, paidPrice } = await req.json()
+    
+    // API anahtarlarını kontrol et
+    const apiKey = Deno.env.get('IYZIPAY_API_KEY')
+    const secretKey = Deno.env.get('IYZIPAY_SECRET_KEY')
+    const baseUrl = Deno.env.get('IYZIPAY_BASE_URL')
+    
+    if (!apiKey || !secretKey || !baseUrl) {
+      throw new Error('Iyzipay API bilgileri eksik')
+    }
+
+    const iyzipay = new Iyzipay({
+      apiKey,
+      secretKey,
+      uri: baseUrl
+    })
+
+    // Supabase client oluştur
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')
+    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
+
+    if (!supabaseUrl || !supabaseKey) {
+      throw new Error('Supabase URL veya Service Role Key eksik')
+    }
+
+    const supabaseClient = createClient(supabaseUrl, supabaseKey)
 
     // Kullanıcı bilgilerini al
-    const { data: userData, error: userError } = await supabase
+    const { data: userData, error: userError } = await supabaseClient
       .from('users')
       .select('*')
       .eq('id', userId)
@@ -63,7 +91,7 @@ serve(async (req) => {
     })
 
     // İşlemi veritabanına kaydet
-    await supabase
+    await supabaseClient
       .from('payment_transactions')
       .insert({
         user_id: userId,
@@ -76,13 +104,22 @@ serve(async (req) => {
 
     return new Response(
       JSON.stringify(result),
-      { headers: { 'Content-Type': 'application/json' } }
+      { headers: { 
+        ...corsHeaders,
+        'Content-Type': 'application/json' 
+      } }
     )
 
   } catch (error) {
     return new Response(
       JSON.stringify({ error: error.message }),
-      { status: 400, headers: { 'Content-Type': 'application/json' } }
+      { 
+        status: 400, 
+        headers: { 
+          ...corsHeaders,
+          'Content-Type': 'application/json' 
+        } 
+      }
     )
   }
 })

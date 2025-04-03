@@ -22,10 +22,14 @@ serve(async (req) => {
     }
 
     // Supabase client oluştur
-    const supabaseClient = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-    )
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')
+    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
+
+    if (!supabaseUrl || !supabaseKey) {
+      throw new Error('Supabase URL veya Service Role Key eksik')
+    }
+
+    const supabaseClient = createClient(supabaseUrl, supabaseKey)
 
     // Sorgu oluşturma
     let query = supabaseClient
@@ -103,7 +107,6 @@ serve(async (req) => {
     )
   }
 })
-
 // Başlangıç saatine 1 saat ekler (tüm dersler 1 saatliktir)
 function getNormalizedEndTime(startTime: string): string {
   const [hours, minutes] = startTime.split(':').map(Number)

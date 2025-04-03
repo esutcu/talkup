@@ -1,12 +1,21 @@
-# supabase/functions/payment-webhook/index.ts
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
-import { createClient } from 'https://esm.sh/@supabase/supabase-js'
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
-// Webhook secret kontrolü için
-const WEBHOOK_SECRET = Deno.env.get('IYZIPAY_WEBHOOK_SECRET')
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+}
 
 serve(async (req) => {
+  // CORS için OPTIONS request kontrol
+  if (req.method === 'OPTIONS') {
+    return new Response('ok', { headers: corsHeaders })
+  }
+  
   try {
+    // Webhook secret kontrolü için
+    const WEBHOOK_SECRET = Deno.env.get('IYZIPAY_WEBHOOK_SECRET')
+    
     // Gelen webhook secret kontrolü
     const signature = req.headers.get('x-iyzico-signature')
     if (!signature || signature !== WEBHOOK_SECRET) {
@@ -17,13 +26,17 @@ serve(async (req) => {
     const { status, paymentId, conversationId, token } = payload
 
     // Supabase client oluştur
-    const supabase = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-    )
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')
+    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
+
+    if (!supabaseUrl || !supabaseKey) {
+      throw new Error('Supabase URL veya Service Role Key eksik')
+    }
+
+    const supabaseClient = createClient(supabaseUrl, supabaseKey)
 
     // Ödeme işlemini bul
-    const { data: transaction, error: transactionError } = await supabase
+    const { data: transaction, error: transactionError } = await supabaseClient
       .from('payment_transactions')
       .select(`
         *,
@@ -42,15 +55,15 @@ serve(async (req) => {
     // Status kontrolü ve işlem
     switch (status) {
       case 'SUCCESS':
-        await handleSuccessfulPayment(supabase, transaction)
+        await handleSuccessfulPayment(supabaseClient, transaction)
         break
       
       case 'FAILURE':
-        await handleFailedPayment(supabase, transaction)
+        await handleFailedPayment(supabaseClient, transaction)
         break
       
       case 'INIT_FAILED':
-        await handleInitFailure(supabase, transaction)
+        await handleInitFailure(supabaseClient, transaction)
         break
 
       default:
@@ -59,20 +72,29 @@ serve(async (req) => {
 
     return new Response(
       JSON.stringify({ success: true }),
-      { headers: { 'Content-Type': 'application/json' } }
+      { headers: { 
+        ...corsHeaders,
+        'Content-Type': 'application/json' 
+      } }
     )
 
   } catch (error) {
     return new Response(
       JSON.stringify({ error: error.message }),
-      { status: 400, headers: { 'Content-Type': 'application/json' } }
+      { 
+        status: 400, 
+        headers: { 
+          ...corsHeaders,
+          'Content-Type': 'application/json' 
+        } 
+      }
     )
   }
 })
 
-async function handleSuccessfulPayment(supabase: any, transaction: any) {
+async function handleSuccessfulPayment(supabaseClient, transaction) {
   // Başarılı ödeme senaryosu
-  await supabase.transaction(async (tx: any) => {
+  await supabaseClient.transaction(async (tx) => {
     // Kullanıcıya kredileri ekle
     await tx
       .from('users')
@@ -112,9 +134,9 @@ async function handleSuccessfulPayment(supabase: any, transaction: any) {
   })
 }
 
-async function handleFailedPayment(supabase: any, transaction: any) {
+async function handleFailedPayment(supabaseClient, transaction) {
   // Başarısız ödeme senaryosu
-  await supabase.transaction(async (tx: any) => {
+  await supabaseClient.transaction(async (tx) => {
     // İşlem durumunu güncelle
     await tx
       .from('payment_transactions')
@@ -135,9 +157,9 @@ async function handleFailedPayment(supabase: any, transaction: any) {
   })
 }
 
-async function handleInitFailure(supabase: any, transaction: any) {
+async function handleInitFailure(supabaseClient, transaction) {
   // Ödeme başlatma hatası senaryosu
-  await supabase
+  await supabaseClient
     .from('payment_transactions')
     .update({ 
       status: 'init_failed',

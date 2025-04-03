@@ -22,10 +22,14 @@ serve(async (req) => {
     }
 
     // Supabase client oluştur
-    const supabaseClient = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-    )
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')
+    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
+
+    if (!supabaseUrl || !supabaseKey) {
+      throw new Error('Supabase URL veya Service Role Key eksik')
+    }
+
+    const supabaseClient = createClient(supabaseUrl, supabaseKey)
 
     // Belirtilen tarih ve saatte müsait öğretmenleri bul
     const { data, error } = await supabaseClient

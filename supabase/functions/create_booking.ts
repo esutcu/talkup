@@ -23,10 +23,14 @@ serve(async (req) => {
     }
 
     // Supabase client oluştur
-    const supabaseClient = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-    )
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')
+    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
+
+    if (!supabaseUrl || !supabaseKey) {
+      throw new Error('Supabase URL veya Service Role Key eksik')
+    }
+
+    const supabaseClient = createClient(supabaseUrl, supabaseKey)
 
     // 1. Kullanıcının yeterli kredisi var mı kontrol et
     const { data: userData, error: userError } = await supabaseClient
@@ -60,10 +64,11 @@ serve(async (req) => {
 
     // 3. Transaction başlat
     // tüm işlemler bir transaction içinde yapılır - ya hepsi başarılı olur ya da hiçbiri (rollback)
+    const bookingId = crypto.randomUUID ? crypto.randomUUID() : self.crypto.randomUUID();
     const { data: transactionResult, error: transactionError } = await supabaseClient.rpc(
       'create_booking_transaction',
       {
-        p_booking_id: crypto.randomUUID(),
+        p_booking_id: bookingId,
         p_student_id: studentId,
         p_teacher_id: teacherId,
         p_date: date,

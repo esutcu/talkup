@@ -22,10 +22,17 @@ serve(async (req) => {
       throw new Error('Rezervasyon ID, öğrenci ID ve öğretmen ID zorunludur')
     }
 
+    // Supabase client oluştur
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')
+    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
+
+    if (!supabaseUrl || !supabaseKey) {
+      throw new Error('Supabase URL veya Service Role Key eksik')
+    }
+
+    const supabaseClient = createClient(supabaseUrl, supabaseKey)
+
     // Google Meet linki oluştur
-    // Tamamen random bir link yerine, organizasyonun kendi Google Meet alanında
-    // gelecek istekleri için aşağıdaki gibi bir yapı oluşturuluyor
-    // Örnek: https://meet.google.com/abc-defg-hij
     const meetId = nanoid(10) // 10 karakter uzunluğunda unique ID
     
     // Link formatını oluştur: 3-4-3 karakter
@@ -34,12 +41,6 @@ serve(async (req) => {
     const part3 = meetId.substring(7, 10)
     
     const meetLink = `https://meet.google.com/${part1}-${part2}-${part3}`
-
-    // Supabase client oluştur
-    const supabaseClient = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-    )
 
     // Rezervasyonu güncelle
     const { error } = await supabaseClient

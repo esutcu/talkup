@@ -139,7 +139,7 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
-import { Calendar, Users, Clock, CheckCircle } from 'lucide-vue-next'
+import { Users, Clock } from 'lucide-vue-next'
 import { useSupabase } from '@/composables/useSupabase'
 import { useGoogleCalendar } from '@/composables/useGoogleCalendar'
 import { useJoinMeet } from '@/composables/useJoinMeet'
