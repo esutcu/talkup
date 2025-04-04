@@ -65,6 +65,10 @@ const router = createRouter({
         {
           path: 'packages',
           component: () => import('@/pages/admin/Packages.vue')
+        },
+        {
+          path: 'teachers',
+          component: () => import('@/pages/admin/Teachers.vue')
         }
       ]
     }
@@ -72,7 +76,7 @@ const router = createRouter({
 })
 
 // Auth Guard
-router.beforeEach((to, from, next) => {
+router.beforeEach((to, _, next) => {
   const authStore = useAuthStore()
   
   if (to.meta.requiresAuth && !authStore.isAuthenticated) {

@@ -1,12 +1,13 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { useSupabase } from '@/composables/useSupabase'
+import type { User } from '@/types'
 
 export const useAuthStore = defineStore('auth', () => {
   const { supabase } = useSupabase()
   
   // State
-  const user = ref(null)
+  const user = ref<User | null>(null)
   const isLoading = ref(false)
   
   // Computed
@@ -30,36 +31,45 @@ export const useAuthStore = defineStore('auth', () => {
       
       return true
     } catch (err) {
+      console.error('Login error:', err)
       return false
     } finally {
       isLoading.value = false
     }
   }
 
-  const register = async (email: string, password: string, role: string) => {
+  const register = async (email: string, password: string, name: string) => {
     isLoading.value = true
     try {
-      const { data, error } = await supabase.auth.signUp({
+      const { data: authData, error: authError } = await supabase.auth.signUp({
         email,
-        password
+        password,
+        options: {
+          data: { name }
+        }
       })
       
-      if (error) throw error
+      if (authError) throw authError
       
-      if (data.user) {
-        await supabase.from('users').insert({
-          id: data.user.id,
+      if (authData.user) {
+        const { error: dbError } = await supabase.from('users').insert({
+          id: authData.user.id,
           email,
-          role,
-          credits: role === 'student' ? 0 : null
+          name,
+          role: 'student',
+          status: 'active',
+          credits: 0
         })
         
-        await loadUser(data.user.id)
+        if (dbError) throw dbError
+        
+        await loadUser(authData.user.id)
       }
       
       return true
     } catch (err) {
-      return false 
+      console.error('Register error:', err)
+      return false
     } finally {
       isLoading.value = false
     }
@@ -78,7 +88,7 @@ export const useAuthStore = defineStore('auth', () => {
       .single()
       
     if (data) {
-      user.value = data
+      user.value = data as User
     }
   }
 

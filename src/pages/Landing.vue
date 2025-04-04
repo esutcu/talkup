@@ -502,8 +502,6 @@
   </div>
 </template>
 <script setup lang="ts">
-import { ref } from 'vue';
-import { useRouter } from 'vue-router';
 import { 
   Calendar as CalendarIcon,
   CreditCard as CreditCardIcon,
@@ -516,9 +514,7 @@ import {
   Twitter as TwitterIcon,
   Instagram as InstagramIcon,
   Linkedin as LinkedinIcon
-} from 'lucide-vue-next';
-
-const router = useRouter();
+} from 'lucide-vue-next'
 
 // Demo öğretmenler
 const teachersList = [
@@ -550,7 +546,7 @@ const teachersList = [
     rating: 4,
     avatar: 'https://randomuser.me/api/portraits/women/65.jpg'
   }
-];
+]
 
 // Demo yorumlar
 const testimonialsList = [
@@ -575,17 +571,19 @@ const testimonialsList = [
     comment: 'Evden çıkmadan, istediğim zaman ders alabilmek harika. Öğretmenler gerçekten alanlarında uzmanlar.',
     avatar: 'https://randomuser.me/api/portraits/women/85.jpg'
   }
-];
-
-// Kayıt sayfasına yönlendir
-const goToRegister = () => {
-  router.push('/register');
-};
+]
 </script>
+
+# Style kısmı
 <style scoped>
 .btn-primary,
 .btn-secondary {
-  @apply px-6 py-3 rounded-lg font-medium transition-colors duration-300 inline-block text-center;
+  padding: 0.75rem 1.5rem;
+  border-radius: 0.5rem;
+  font-weight: 500;
+  transition: all 300ms;
+  display: inline-block;
+  text-align: center;
 }
 
 .feature-card,
@@ -593,15 +591,19 @@ const goToRegister = () => {
 .package-card,
 .teacher-card,
 .testimonial-card {
-  @apply p-6 bg-white rounded-lg shadow-sm hover:shadow-md transition-all duration-300;
+  padding: 1.5rem;
+  background-color: white;
+  border-radius: 0.5rem;
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  transition: all 300ms;
 }
 
-.feature-icon {
-  @apply w-14 h-14 rounded-full flex items-center justify-center transition-all duration-300;
-}
-
-.step-number {
-  @apply w-10 h-10 rounded-full bg-[#3871b1] text-white flex items-center justify-center font-bold;
+.feature-card:hover,
+.step-card:hover,
+.package-card:hover,
+.teacher-card:hover,
+.testimonial-card:hover {
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
 }
 
 /* Animasyon */
